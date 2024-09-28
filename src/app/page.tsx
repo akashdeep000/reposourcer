@@ -1,101 +1,215 @@
-import Image from "next/image";
+'use client'
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { graphql } from "@octokit/graphql";
+import { useEffect, useState } from "react";
+import { RateLimit, Stargazer, StargazersData } from "../../types";
+import { DataTable } from "./data-table";
+import { columns } from "./columns";
+import { Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress"
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [repoUrl, setRepoUrl] = useState<string>("");
+  const [stargazers, setStargazers] = useState<Stargazer[]>([]);
+  const [initLoading, setInitLoading] = useState<boolean>(false);
+  const [filteredStargazers, setFilteredStargazers] = useState(stargazers)
+  const [needEmail, setNeedEmail] = useState<boolean>(false)
+  const [needLocation, setNeedLocation] = useState<boolean>(false)
+  const [rateLimit, setRateLimit] = useState<RateLimit | undefined>()
+  const [total, setTotal] = useState<number>(0)
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [isAllLoading, setIsAllLoading] = useState<boolean>(false)
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  const graphqlWithAuth = graphql.defaults({
+    headers: {
+      authorization: `token ${localStorage.getItem("apiKey")}`,
+    },
+  });
+
+  const githubRepoRegex = /github\.com\/([^\/]+)\/([^\/]+)/;
+  const getRepoFromUrl = (url: string) => {
+    const match = url.match(githubRepoRegex);
+    if (match && match.length === 3) {
+      return { owner: match[1], repo: match[2] };
+    } else {
+      throw new Error("Invalid GitHub repository URL");
+    }
+  };
+
+  const getStargazers = async (url: string, cursor: string | null = null) => {
+    const { owner, repo } = getRepoFromUrl(url);
+    console.log(owner, repo);
+    const after = cursor ? `"${cursor}"` : null;
+    const result = await graphqlWithAuth(`
+      {
+        repository(owner: "${owner}", name: "${repo}") {
+          stargazers(first: 100, after: ${after}) {
+            totalCount
+            nodes {
+              avatarUrl
+              name
+              url
+              followers {
+                totalCount
+              }
+              company
+              email
+              location
+              websiteUrl
+              twitterUsername
+              repositories {
+                totalCount
+              }
+            }
+            pageInfo {
+              endCursor
+              hasNextPage
+            }
+          }
+        }
+        rateLimit {
+          cost
+          remaining
+          limit
+          resetAt
+        }
+      }
+    `) as StargazersData;
+    setRateLimit(result.rateLimit)
+    setTotal(total => result.repository?.stargazers.totalCount || total)
+    return result
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    (async () => {
+      setStargazers([])
+      setCursor(null)
+      setIsAllLoading(false)
+      setInitLoading(true);
+      try {
+        const result = await getStargazers(repoUrl)
+        if (result.repository) {
+          setStargazers(result.repository.stargazers.nodes);
+          if (result.repository.stargazers.pageInfo.hasNextPage) {
+            setCursor(result.repository.stargazers.pageInfo.endCursor)
+          }
+        }
+      } catch (error) {
+        console.log(error);
+      }
+      setInitLoading(false);
+    })()
+  };
+
+  useEffect(() => {
+    setFilteredStargazers(stargazers.filter(stargazer => {
+      if (needEmail && needLocation) {
+        return stargazer.email && stargazer.location
+      }
+      if (needEmail) {
+        return stargazer.email
+      }
+      if (needLocation) {
+        return stargazer.location
+      }
+      return true
+    }))
+  }, [needEmail, needLocation, stargazers])
+
+  useEffect(() => {
+    (async () => {
+      const result = await graphqlWithAuth(`
+        {
+          rateLimit {
+            cost
+            remaining
+            limit
+            resetAt
+          }
+        }
+      `) as {
+        rateLimit: RateLimit
+      };
+      setRateLimit(result.rateLimit)
+    })()
+  }, [])
+
+  const addPage = async (repoUrl: string, cursor: string) => {
+    const result = await getStargazers(repoUrl, cursor)
+    if (result.repository) {
+      setStargazers(stargazers => [...stargazers, ...result.repository?.stargazers.nodes || []]);
+      if (result.repository.stargazers.pageInfo.hasNextPage) {
+        setCursor(result.repository.stargazers.pageInfo.endCursor)
+      } else {
+        setCursor(null)
+        setIsAllLoading(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!cursor || !isAllLoading) return
+    (async () => {
+      await addPage(repoUrl, cursor)
+    })()
+  }, [isAllLoading, cursor])
+
+
+  return (
+    <div className="p-4">
+      <div className="grid place-items-center sm:mt-4">
+        <form onSubmit={handleSubmit} className="grid gap-2 sm:grid-cols-[1fr_auto] w-full max-w-prose">
+          <Input type="url" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://github.com/user/repo" />
+          <Button disabled={!(repoUrl.match(githubRepoRegex)?.length === 3)} type="submit">
+            {
+              initLoading ? (<div className="flex gap-2 items-center"><p>Loading...</p><Loader2 size={18} className="animate-spin" /></div>) : "Get Stargazers"
+            }
+          </Button>
+        </form>
+        <p className="text-sm text-muted-foreground mt-2">
+          {rateLimit && `Rate Limit: ${rateLimit.remaining}/${rateLimit.limit} (Resets at ${new Date(rateLimit.resetAt).toLocaleString()})`}
+        </p>
+      </div>
+      <div className="">
+        {total ?
+          (<div className="mt-4">
+            <Progress value={(stargazers.length / total) * 100} className="w-full" />
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-sm">
+                {stargazers.length} / {total}
+              </p>
+              <Button disabled={total === stargazers.length} variant="default" onClick={() => setIsAllLoading(!isAllLoading)}>{stargazers.length === total ? "Completed" : !isAllLoading && stargazers.length <= 100 ? "Load All" : isAllLoading ? "Pause" : "Resume"}</Button>
+            </div>
+          </div>) : null
+        }
+        <div className="flex gap-4 px-2 mt-6">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="needEmail"
+              checked={needEmail}
+              onCheckedChange={(value) => setNeedEmail(!!value)}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <Label htmlFor="needEmail">Need Email</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="needLocation"
+              checked={needLocation}
+              onCheckedChange={(value) => setNeedLocation(!!value)}
+            />
+            <Label htmlFor="needLocation">Need Location</Label>
+          </div>
+          <p>
+            Total: {filteredStargazers.length}
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+      <DataTable columns={columns} data={filteredStargazers} />
     </div>
-  );
+  )
 }
