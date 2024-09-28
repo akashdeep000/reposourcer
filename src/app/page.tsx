@@ -11,6 +11,8 @@ import { Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress"
+import { toast } from "@/hooks/use-toast";
+import { useLocalStorage } from "@/hook/useLocalStorage";
 
 export default function Home() {
   const [repoUrl, setRepoUrl] = useState<string>("");
@@ -23,12 +25,11 @@ export default function Home() {
   const [total, setTotal] = useState<number>(0)
   const [cursor, setCursor] = useState<string | null>(null)
   const [isAllLoading, setIsAllLoading] = useState<boolean>(false)
-
-  const ISBROWSER = typeof window !== "undefined";
-
+  const [apiKey, setApiKey] = useLocalStorage<string | null>("apiKey", null)
+  
   const graphqlWithAuth = graphql.defaults({
     headers: {
-      authorization: `token ${ISBROWSER ? localStorage?.getItem("apiKey") : ""}`,
+      authorization: `token ${apiKey}`,
     },
   });
 
@@ -88,6 +89,12 @@ export default function Home() {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!apiKey) {
+      return toast({
+        title: "Set API key on the header section",
+        variant: "destructive"
+      })
+    }
     (async () => {
       setStargazers([])
       setCursor(null)
@@ -101,8 +108,13 @@ export default function Home() {
             setCursor(result.repository.stargazers.pageInfo.endCursor)
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.log(error);
+        toast({
+          title: "Error",
+          description: error?.message,
+          variant: "destructive"
+        })
       }
       setInitLoading(false);
     })()
@@ -125,19 +137,28 @@ export default function Home() {
 
   useEffect(() => {
     (async () => {
-      const result = await graphqlWithAuth(`
-        {
-          rateLimit {
-            cost
-            remaining
-            limit
-            resetAt
+      try {
+        const result = await graphqlWithAuth(`
+          {
+            rateLimit {
+              cost
+              remaining
+              limit
+              resetAt
+            }
           }
-        }
-      `) as {
-        rateLimit: RateLimit
-      };
-      setRateLimit(result.rateLimit)
+        `) as {
+          rateLimit: RateLimit
+        };
+        setRateLimit(result.rateLimit)
+      } catch (error: any) {
+        console.log(error);
+        toast({
+          title: "Error",
+          description: error?.message,
+          variant: "destructive"
+        })
+      }
     })()
   }, [])
 
