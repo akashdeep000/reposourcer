@@ -14,18 +14,21 @@ import { toast } from "@/hooks/use-toast";
 import { FormEvent, useState } from "react";
 
 export default function Header() {
+    const ISBROWSER = typeof window !== "undefined";
     const [open, setOpen] = useState<boolean>(false)
-    const getApiKey = () => {
+    const getApiKey = (): string => {
         // get the api key from local storage
-        return localStorage.getItem("apiKey") || ""
+        if (ISBROWSER) return localStorage.getItem("apiKey") || ""
+        return ""
     }
 
     const [apiKey, setApiKey] = useState<string>(getApiKey())
 
     const saveApiKey = (event: FormEvent) => {
         event.preventDefault()
+        if (!ISBROWSER) return
         // save the api key to local storage
-        localStorage.setItem("apiKey", apiKeyInput)
+        localStorage?.setItem("apiKey", apiKeyInput)
         setApiKey(apiKey)
         toast({ title: "API Key Saved" })
         setOpen(false)

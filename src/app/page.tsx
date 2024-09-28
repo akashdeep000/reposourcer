@@ -24,9 +24,11 @@ export default function Home() {
   const [cursor, setCursor] = useState<string | null>(null)
   const [isAllLoading, setIsAllLoading] = useState<boolean>(false)
 
+  const ISBROWSER = typeof window !== "undefined";
+
   const graphqlWithAuth = graphql.defaults({
     headers: {
-      authorization: `token ${localStorage.getItem("apiKey")}`,
+      authorization: `token ${ISBROWSER ? localStorage?.getItem("apiKey") : ""}`,
     },
   });
 
