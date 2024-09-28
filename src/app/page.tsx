@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress"
 import { toast } from "@/hooks/use-toast";
-import { useLocalStorage } from "@/hook/useLocalStorage";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export default function Home() {
   const [repoUrl, setRepoUrl] = useState<string>("");
@@ -136,6 +136,7 @@ export default function Home() {
   }, [needEmail, needLocation, stargazers])
 
   useEffect(() => {
+    if(!apiKey) return
     (async () => {
       try {
         const result = await graphqlWithAuth(`

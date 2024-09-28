@@ -10,7 +10,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { useLocalStorage } from "@/hook/useLocalStorage";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { toast } from "@/hooks/use-toast";
 import { graphql } from "@octokit/graphql";
 import { FormEvent, useState } from "react";
@@ -40,14 +40,13 @@ export default function Header() {
                       }
                     }
                   `)
-                setApiKey(apiKey)
+                setApiKey(apiKeyInput)
                 toast({ title: "API Key Saved" })
                 setOpen(false)
             } catch (error: any) {
-                console.log(error);
+                console.log({error: error?.message});
                 toast({
                     title: "Invalid API key",
-                    description: error?.message,
                     variant: "destructive"
                 })
             }
