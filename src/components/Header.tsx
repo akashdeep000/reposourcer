@@ -20,7 +20,8 @@ export default function Header() {
     const [apiKey, setApiKey] = useLocalStorage<string | null>("apiKey", null)
     const [apiKeyInput, setApiKeyInput] = useState<string>(apiKey || "")
     const [isClient, setIsClient] = useState(false)
- 
+    const [isChecking, setIsChecking] = useState(false)
+
     useEffect(() => {
       setIsClient(true)
     }, [])
@@ -33,6 +34,7 @@ export default function Header() {
 
     const saveApiKey = (event: FormEvent) => {
         event.preventDefault();
+        setIsChecking(true);
         (async () => {
             try {
                 const result = await graphqlWithAuth(`
@@ -55,6 +57,7 @@ export default function Header() {
                     variant: "destructive"
                 })
             }
+            setIsChecking(false)
         })()
     }
 
@@ -73,12 +76,12 @@ export default function Header() {
                             <DialogTitle>Add API Key</DialogTitle>
                             <DialogDescription>
                                 Add your API key to get started.
-                            </DialogDescription>typeof window
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="">
                             <form className="grid grid-cols-[1fr_auto] gap-2" onSubmit={saveApiKey}>
                                 <Input placeholder="API Key" value={apiKeyInput} onChange={(e) => setApiKeyInput(e.target.value)} />
-                                <Button disabled={!apiKeyInput} type="submit">Save</Button>
+                                <Button disabled={!apiKeyInput || isChecking} type="submit">{isChecking ? "Saving..." : "Save"}</Button>
                             </form>
                         </div>
                     </DialogContent>
