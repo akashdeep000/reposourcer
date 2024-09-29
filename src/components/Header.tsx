@@ -13,13 +13,18 @@ import { Input } from "@/components/ui/input"
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { toast } from "@/hooks/use-toast";
 import { graphql } from "@octokit/graphql";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 export default function Header() {
     const [open, setOpen] = useState<boolean>(false)
     const [apiKey, setApiKey] = useLocalStorage<string | null>("apiKey", null)
     const [apiKeyInput, setApiKeyInput] = useState<string>(apiKey || "")
-
+    const [isClient, setIsClient] = useState(false)
+ 
+    useEffect(() => {
+      setIsClient(true)
+    }, [])
+    
     const graphqlWithAuth = graphql.defaults({
         headers: {
             authorization: `token ${apiKeyInput}`,
@@ -59,14 +64,16 @@ export default function Header() {
             <div>
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="default" suppressHydrationWarning>{apiKey ? "Change" : "Add"} API Key</Button>
+                    {isClient ? 
+                        <Button variant="default">{apiKey ? "Change" : "Add"} API Key</Button> : null
+                    }
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Add API Key</DialogTitle>
                             <DialogDescription>
                                 Add your API key to get started.
-                            </DialogDescription>
+                            </DialogDescription>typeof window
                         </DialogHeader>
                         <div className="">
                             <form className="grid grid-cols-[1fr_auto] gap-2" onSubmit={saveApiKey}>

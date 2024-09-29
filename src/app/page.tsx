@@ -26,7 +26,7 @@ export default function Home() {
   const [cursor, setCursor] = useState<string | null>(null)
   const [isAllLoading, setIsAllLoading] = useState<boolean>(false)
   const [apiKey, setApiKey] = useLocalStorage<string | null>("apiKey", null)
-  
+
   const graphqlWithAuth = graphql.defaults({
     headers: {
       authorization: `token ${apiKey}`,
@@ -43,7 +43,7 @@ export default function Home() {
     }
   };
 
-  const getStargazers = async (url: string, cursor: string | null = null) => {
+  const getStargazers = async (url: string, cursor: string | null = null) : Promise<StargazersData> => {
     const { owner, repo } = getRepoFromUrl(url);
     console.log(owner, repo);
     const after = cursor ? `"${cursor}"` : null;
@@ -51,41 +51,68 @@ export default function Home() {
       {
         repository(owner: "${owner}", name: "${repo}") {
           stargazers(first: 100, after: ${after}) {
-            totalCount
-            nodes {
-              avatarUrl
-              name
-              url
-              followers {
-                totalCount
-              }
-              company
-              email
-              location
-              websiteUrl
-              twitterUsername
-              repositories {
-                totalCount
-              }
+          totalCount
+          nodes {
+            avatarUrl
+            name
+            url
+            followers {
+              totalCount
             }
-            pageInfo {
-              endCursor
-              hasNextPage
+            company
+            email
+            location
+            websiteUrl
+            twitterUsername
+            repositories(first: 10, visibility:PUBLIC, ownerAffiliations: OWNER, orderBy: {field: STARGAZERS, direction: DESC}) {
+              totalCount
+              nodes {
+                stargazerCount
+              }
+              totalCount
+              pageInfo {
+                endCursor
+                hasNextPage
+              }
             }
           }
-        }
-        rateLimit {
-          cost
-          remaining
-          limit
-          resetAt
+          pageInfo {
+            endCursor
+            hasNextPage
+          }
         }
       }
+      rateLimit {
+        cost
+        remaining
+        limit
+        resetAt
+      }
+    }
     `) as StargazersData;
     setRateLimit(result.rateLimit)
     setTotal(total => result.repository?.stargazers.totalCount || total)
     return result
   };
+
+  const stractureProfile = (result: StargazersData) => {
+    const structuredProfile = result.repository?.stargazers.nodes.map((profile) => {
+      const repos = profile.repositories.nodes
+      let totalStar = 0
+      repos?.forEach((repo) => {
+        if (repo.stargazerCount === 0) return
+        totalStar = totalStar + repo.stargazerCount
+      })
+      return {
+        ...profile,
+        repositories: {
+          totalCount: profile.repositories.totalCount,
+          totalStar,
+        }
+      }
+    })
+    return structuredProfile as Stargazer[]
+  }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -103,7 +130,7 @@ export default function Home() {
       try {
         const result = await getStargazers(repoUrl)
         if (result.repository) {
-          setStargazers(result.repository.stargazers.nodes);
+          setStargazers(stractureProfile(result));
           if (result.repository.stargazers.pageInfo.hasNextPage) {
             setCursor(result.repository.stargazers.pageInfo.endCursor)
           }
@@ -136,7 +163,7 @@ export default function Home() {
   }, [needEmail, needLocation, stargazers])
 
   useEffect(() => {
-    if(!apiKey) return
+    if (!apiKey) return
     (async () => {
       try {
         const result = await graphqlWithAuth(`
@@ -165,8 +192,8 @@ export default function Home() {
 
   const addPage = async (repoUrl: string, cursor: string) => {
     const result = await getStargazers(repoUrl, cursor)
-    if (result.repository) {
-      setStargazers(stargazers => [...stargazers, ...result.repository?.stargazers.nodes || []]);
+    if (result.repository && result.repository?.stargazers.nodes) {
+      setStargazers(stargazers => [...stargazers, ...stractureProfile(result)]);
       if (result.repository.stargazers.pageInfo.hasNextPage) {
         setCursor(result.repository.stargazers.pageInfo.endCursor)
       } else {

@@ -1,14 +1,14 @@
 
 export interface StargazersData {
     repository?: Repository;
-    rateLimit:  RateLimit;
+    rateLimit: RateLimit;
 }
 
 export interface RateLimit {
-    cost:      number;
+    cost: number;
     remaining: number;
-    limit:     number;
-    resetAt:   Date;
+    limit: number;
+    resetAt: Date;
 }
 
 export interface Repository {
@@ -17,38 +17,32 @@ export interface Repository {
 
 export interface Stargazers {
     totalCount: number;
-    nodes:      Stargazer[];
-    pageInfo:   PageInfo;
+    nodes: Stargazer[];
+    pageInfo: PageInfo;
 }
 
 export interface Stargazer {
-    avatarUrl:       string;
-    name:            string;
-    url:             string;
-    followers:       Followers;
-    company:         null | string;
-    email:           string;
-    location:        null | string;
-    websiteUrl:      null | string;
+    avatarUrl: string;
+    name: string;
+    url: string;
+    followers: {
+        totalCount: number;
+    };
+    company: null | string;
+    email: string;
+    location: null | string;
+    websiteUrl: null | string;
     twitterUsername: null | string;
-    repositories:    Followers;
-}
-
-export interface Followers {
-    totalCount: number;
+    repositories: {
+        totalCount?: number;
+        totalStar?: number;
+        nodes?: {
+            stargazerCount: number;
+        }[]
+    };
 }
 
 export interface PageInfo {
-    endCursor:   string;
+    endCursor: string;
     hasNextPage: boolean;
 }
-
-// export interface Error {
-//     type:      string;
-//     path?:      string[];
-//     locations?: {
-//         line:   number;
-//         column: number;
-//     };
-//     message:   string;
-// }

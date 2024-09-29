@@ -91,6 +91,14 @@ export const columns: ColumnDef<Stargazer>[] = [
     }
   },
   {
+    accessorKey: "repositories",
+    header: "Total Stars (Top 10 repo)",
+    cell: ({ row }) => {
+      const value: {totalStar: number} = row.getValue("repositories")
+      return value.totalStar
+    }
+  },
+  {
     accessorKey: "url",
     header: "Activity",
     cell: ({ row }) => {
